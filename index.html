@@ -115,7 +115,9 @@
     chat.scrollTop = chat.scrollHeight;
   }
 
- function sendMessage() {
+ let conversationHistory = [];
+
+function sendMessage() {
   const input = document.getElementById("messageInput");
   const text = input.value.trim();
 
@@ -123,6 +125,15 @@
 
   addMessage(text, "user");
   input.value = "";
+
+  conversationHistory.push({
+    role: "user",
+    parts: [
+      {
+        text: text
+      }
+    ]
+  });
 
   const backendUrl = "https://script.google.com/macros/s/AKfycbzThtmNC1EuLZcrDEu-1OLSewHs9Wn79LxPlhvySjX33xshI9mQz-LN-Mp2qmfFJXps/exec";
 
@@ -134,7 +145,8 @@
       "Content-Type": "text/plain"
     },
     body: JSON.stringify({
-      message: text
+      message: text,
+      history: conversationHistory
     })
   })
   .then(response => response.json())
@@ -142,14 +154,31 @@
     const messages = document.querySelectorAll(".mizuki");
     const lastMessage = messages[messages.length - 1];
 
-    if (lastMessage.textContent === "考えてるよ…🌙") {
-      lastMessage.textContent = data.reply || "ごめんね、うまく返事できなかったみたい。";
-    } else {
-      addMessage(
-        data.reply || "ごめんね、うまく返事できなかったみたい。",
-        "mizuki"
-      );
-    }
+    const reply =
+      data.reply ||
+      "ごめんね、うまく返事できなかったみたい。";
+
+    lastMessage.textContent = reply;
+
+    conversationHistory.push({
+      role: "model",
+      parts: [
+        {
+          text: reply
+        }
+      ]
+    });
+  })
+  .catch(error => {
+    console.error(error);
+
+    const messages = document.querySelectorAll(".mizuki");
+    const lastMessage = messages[messages.length - 1];
+
+    lastMessage.textContent =
+      "ごめんね、今ちょっと接続できないみたい。";
+  });
+}
   })
   .catch(error => {
     console.error(error);
