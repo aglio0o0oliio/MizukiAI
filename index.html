@@ -78,6 +78,11 @@
       background: #9c6b9f;
       color: white;
       font-size: 16px;
+      cursor: pointer;
+    }
+
+    button:active {
+      opacity: 0.8;
     }
   </style>
 </head>
@@ -104,6 +109,17 @@
 </div>
 
 <script>
+  // ==============================
+  // 美月との会話履歴
+  // ==============================
+
+  let conversationHistory = [];
+
+
+  // ==============================
+  // メッセージを画面に追加
+  // ==============================
+
   function addMessage(text, type) {
     const chat = document.getElementById("chat");
 
@@ -115,89 +131,142 @@
     chat.scrollTop = chat.scrollHeight;
   }
 
- let conversationHistory = [];
 
-function sendMessage() {
-  const input = document.getElementById("messageInput");
-  const text = input.value.trim();
+  // ==============================
+  // 美月にメッセージを送る
+  // ==============================
 
-  if (!text) return;
+  function sendMessage() {
+    const input = document.getElementById("messageInput");
+    const text = input.value.trim();
 
-  addMessage(text, "user");
-  input.value = "";
+    if (!text) return;
 
-  conversationHistory.push({
-    role: "user",
-    parts: [
-      {
-        text: text
-      }
-    ]
-  });
+    // ユーザーのメッセージを表示
+    addMessage(text, "user");
 
-  const backendUrl = "https://script.google.com/macros/s/AKfycbzThtmNC1EuLZcrDEu-1OLSewHs9Wn79LxPlhvySjX33xshI9mQz-LN-Mp2qmfFJXps/exec";
+    // 入力欄を空にする
+    input.value = "";
 
-  addMessage("考えてるよ…🌙", "mizuki");
-
-  fetch(backendUrl, {
-    method: "POST",
-    headers: {
-      "Content-Type": "text/plain"
-    },
-    body: JSON.stringify({
-      message: text,
-      history: conversationHistory
-    })
-  })
-  .then(response => response.json())
-  .then(data => {
-    const messages = document.querySelectorAll(".mizuki");
-    const lastMessage = messages[messages.length - 1];
-
-    const reply =
-      data.reply ||
-      "ごめんね、うまく返事できなかったみたい。";
-
-    lastMessage.textContent = reply;
-
+    // 会話履歴にユーザーの発言を追加
     conversationHistory.push({
-      role: "model",
+      role: "user",
       parts: [
         {
-          text: reply
+          text: text
         }
       ]
     });
-  })
-  .catch(error => {
-    console.error(error);
 
-    const messages = document.querySelectorAll(".mizuki");
-    const lastMessage = messages[messages.length - 1];
 
-    lastMessage.textContent =
-      "ごめんね、今ちょっと接続できないみたい。";
-  });
-}
-  })
-  .catch(error => {
-    console.error(error);
+    // ==============================
+    // Apps Script Webアプリ
+    // ==============================
 
-    const messages = document.querySelectorAll(".mizuki");
-    const lastMessage = messages[messages.length - 1];
+    const backendUrl =
+      "https://script.google.com/macros/s/AKfycbzThtmNC1EuLZcrDEu-1OLSewHs9Wn79LxPlhvySjX33xshI9mQz-LN-Mp2qmfFJXps/exec";
 
-    if (lastMessage.textContent === "考えてるよ…🌙") {
-      lastMessage.textContent =
-        "ごめんね、今ちょっと接続できないみたい。";
-    }
-  });
-}
 
-  document.getElementById("messageInput").addEventListener("keydown", function(event) {
-    if (event.key === "Enter") {
-      sendMessage();
-    }
-  });
+    // 考え中表示
+    addMessage("考えてるよ…🌙", "mizuki");
+
+
+    // ==============================
+    // Apps Scriptへ送信
+    // ==============================
+
+    fetch(backendUrl, {
+      method: "POST",
+
+      headers: {
+        "Content-Type": "text/plain"
+      },
+
+      body: JSON.stringify({
+        message: text,
+        history: conversationHistory
+      })
+    })
+
+
+    // ==============================
+    // 美月からの返答を受け取る
+    // ==============================
+
+    .then(response => response.json())
+
+    .then(data => {
+
+      const messages =
+        document.querySelectorAll(".mizuki");
+
+      const lastMessage =
+        messages[messages.length - 1];
+
+
+      const reply =
+        data.reply ||
+        "ごめんね、うまく返事できなかったみたい。";
+
+
+      // 「考えてるよ…🌙」を本当の返答に変更
+      lastMessage.textContent = reply;
+
+
+      // 美月の返答も会話履歴に追加
+      conversationHistory.push({
+        role: "model",
+        parts: [
+          {
+            text: reply
+          }
+        ]
+      });
+
+    })
+
+
+    // ==============================
+    // エラー処理
+    // ==============================
+
+    .catch(error => {
+
+      console.error(error);
+
+      const messages =
+        document.querySelectorAll(".mizuki");
+
+      const lastMessage =
+        messages[messages.length - 1];
+
+
+      if (
+        lastMessage.textContent ===
+        "考えてるよ…🌙"
+      ) {
+        lastMessage.textContent =
+          "ごめんね、今ちょっと接続できないみたい。";
+      }
+
+    });
+  }
+
+
+  // ==============================
+  // Enterキーでも送信
+  // ==============================
+
+  document
+    .getElementById("messageInput")
+    .addEventListener("keydown", function(event) {
+
+      if (event.key === "Enter") {
+        sendMessage();
+      }
+
+    });
+
 </script>
 
 </body>
