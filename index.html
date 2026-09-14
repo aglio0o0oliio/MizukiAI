@@ -84,6 +84,11 @@
     button:active {
       opacity: 0.8;
     }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: default;
+    }
   </style>
 </head>
 
@@ -105,167 +110,201 @@
     type="text"
     placeholder="美月に話しかける..."
   >
-  <button onclick="sendMessage()">送信</button>
+
+  <button id="sendButton" onclick="sendMessage()">
+    送信
+  </button>
 </div>
 
 <script>
-  // ==============================
-  // 美月との会話履歴
-  // ==============================
 
-  let conversationHistory = [];
+  // ========================================
+  // Apps Script Backend
+  // ========================================
+
+  const backendUrl =
+    "https://script.google.com/macros/s/AKfycbzThtmNC1EuLZcrDEu-1OLSewHs9Wn79LxPlhvySjX33xshI9mQz-LN-Mp2qmfFJXps/exec";
 
 
-  // ==============================
+  // ========================================
+  // 美月との現在の会話ID
+  // ========================================
+
+  let previousInteractionId = null;
+
+
+  // ========================================
   // メッセージを画面に追加
-  // ==============================
+  // ========================================
 
   function addMessage(text, type) {
+
     const chat = document.getElementById("chat");
 
     const message = document.createElement("div");
+
     message.className = "message " + type;
+
     message.textContent = text;
 
     chat.appendChild(message);
+
     chat.scrollTop = chat.scrollHeight;
+
+    return message;
   }
 
 
-  // ==============================
+  // ========================================
   // 美月にメッセージを送る
-  // ==============================
+  // ========================================
 
-  function sendMessage() {
-    const input = document.getElementById("messageInput");
-    const text = input.value.trim();
+  async function sendMessage() {
 
-    if (!text) return;
+    const input =
+      document.getElementById("messageInput");
+
+    const button =
+      document.getElementById("sendButton");
+
+    const text =
+      input.value.trim();
+
+
+    if (!text) {
+      return;
+    }
+
 
     // ユーザーのメッセージを表示
+
     addMessage(text, "user");
 
-    // 入力欄を空にする
     input.value = "";
 
-    // 会話履歴にユーザーの発言を追加
-    conversationHistory.push({
-      role: "user",
-      parts: [
-        {
-          text: text
-        }
-      ]
-    });
+    button.disabled = true;
 
 
-    // ==============================
-    // Apps Script Webアプリ
-    // ==============================
+    // 美月の考え中表示
 
-    const backendUrl =
-      "https://script.google.com/macros/s/AKfycbzThtmNC1EuLZcrDEu-1OLSewHs9Wn79LxPlhvySjX33xshI9mQz-LN-Mp2qmfFJXps/exec";
+    const thinkingMessage =
+      addMessage("考えてるよ…🌙", "mizuki");
 
 
-    // 考え中表示
-    addMessage("考えてるよ…🌙", "mizuki");
+    try {
+
+      const requestBody = {
+        message: text
+      };
 
 
-    // ==============================
-    // Apps Scriptへ送信
-    // ==============================
+      // 2回目以降は前回のInteraction IDを送る
 
-    fetch(backendUrl, {
-      method: "POST",
+      if (previousInteractionId) {
 
-      headers: {
-        "Content-Type": "text/plain"
-      },
+        requestBody.previousInteractionId =
+          previousInteractionId;
 
-      body: JSON.stringify({
-        message: text,
-        history: conversationHistory
-      })
-    })
+      }
 
 
-    // ==============================
-    // 美月からの返答を受け取る
-    // ==============================
+      const response =
+        await fetch(
+          backendUrl,
+          {
+            method: "POST",
 
-    .then(response => response.json())
+            headers: {
+              "Content-Type": "text/plain"
+            },
 
-    .then(data => {
+            body: JSON.stringify(requestBody)
+          }
+        );
 
-      const messages =
-        document.querySelectorAll(".mizuki");
 
-      const lastMessage =
-        messages[messages.length - 1];
+      if (!response.ok) {
+        throw new Error(
+          "HTTP error: " + response.status
+        );
+      }
 
+
+      const data =
+        await response.json();
+
+
+      console.log("美月からの返答:", data);
+
+
+      // ========================================
+      // 新しいInteraction IDを保存
+      // ========================================
+
+      if (data.interactionId) {
+
+        previousInteractionId =
+          data.interactionId;
+
+      }
+
+
+      // ========================================
+      // 返答を表示
+      // ========================================
 
       const reply =
         data.reply ||
         "ごめんね、うまく返事できなかったみたい。";
 
 
-      // 「考えてるよ…🌙」を本当の返答に変更
-      lastMessage.textContent = reply;
+      thinkingMessage.textContent =
+        reply;
 
 
-      // 美月の返答も会話履歴に追加
-      conversationHistory.push({
-        role: "model",
-        parts: [
-          {
-            text: reply
-          }
-        ]
-      });
+    } catch (error) {
 
-    })
+      console.error(
+        "通信エラー:",
+        error
+      );
 
 
-    // ==============================
-    // エラー処理
-    // ==============================
-
-    .catch(error => {
-
-      console.error(error);
-
-      const messages =
-        document.querySelectorAll(".mizuki");
-
-      const lastMessage =
-        messages[messages.length - 1];
+      thinkingMessage.textContent =
+        "ごめんね、今ちょっと接続できないみたい。";
 
 
-      if (
-        lastMessage.textContent ===
-        "考えてるよ…🌙"
-      ) {
-        lastMessage.textContent =
-          "ごめんね、今ちょっと接続できないみたい。";
-      }
+    } finally {
 
-    });
+      button.disabled = false;
+
+      input.focus();
+
+    }
+
   }
 
 
-  // ==============================
-  // Enterキーでも送信
-  // ==============================
+  // ========================================
+  // Enterキーで送信
+  // ========================================
 
   document
     .getElementById("messageInput")
-    .addEventListener("keydown", function(event) {
+    .addEventListener(
+      "keydown",
+      function(event) {
 
-      if (event.key === "Enter") {
-        sendMessage();
+        if (event.key === "Enter") {
+
+          event.preventDefault();
+
+          sendMessage();
+
+        }
+
       }
-
-    });
+    );
 
 </script>
 
